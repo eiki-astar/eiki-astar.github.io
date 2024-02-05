@@ -158,14 +158,7 @@ class AStar {
     this.current = this.openSet[lowestIndex];
 
     if (this.current === this.end) {
-      let path = [];
-      let temp = this.current.parent;
-      path.push(temp);
-      while (temp.parent) {
-        path.push(temp.parent);
-        temp = temp.parent;
-      }
-      return { state: AStarState.Found, path: path.reverse() };
+      return { state: AStarState.Found, path: this.retracePath() };
     }
 
     this.openSet.splice(lowestIndex, 1);
@@ -198,6 +191,17 @@ class AStar {
       }
     }
     return { state: AStarState.Searching, path: [] };
+  }
+
+  retracePath() {
+    let path = [];
+    let temp = this.current;
+    path.push(temp);
+    while (temp.parent) {
+      path.push(temp.parent);
+      temp = temp.parent;
+    }
+    return path.reverse();
   }
 }
 
