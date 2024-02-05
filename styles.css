@@ -15,6 +15,7 @@ canvas {
     align-items: center;
     height: 40px;
     margin-left: 1rem;
+    gap: 20px;
 }
 .cell-count-slider {
     width: 50px;
