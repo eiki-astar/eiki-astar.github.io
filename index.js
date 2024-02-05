@@ -9,6 +9,11 @@ const CellState = {
   Path: 5,
 };
 
+const Heuristic = {
+  Manhattan: "Manhattan",
+  Euclidean: "Euclidean",
+};
+
 class Cell {
   constructor(x, y, state) {
     this.x = x;
@@ -92,13 +97,27 @@ class Grid {
       }
     }
   }
+
+  resetSearch() {
+    for (let cell of this.cells) {
+      if (cell.state == CellState.Expanded || cell.state == CellState.Path) {
+        cell.state = CellState.Idle;
+      }
+    }
+  }
 }
 
 // Manhattan distance from now
-function heuristic(from, to) {
+function heuristic(from, to, type) {
   let x = Math.abs(from.x - to.x);
   let y = Math.abs(from.y - to.y);
-  return x + y;
+  switch (type) {
+    case Heuristic.Manhattan:
+      return x + y;
+    case Heuristic.Euclidean:
+      return Math.sqrt(x * x + y * y);
+  }
+  return 0;
 }
 
 const AStarState = {
@@ -108,8 +127,9 @@ const AStarState = {
 };
 
 class AStar {
-  constructor(grid) {
+  constructor(grid, heuristicType) {
     this.grid = grid;
+    this.heuristic = heuristicType;
 
     this.openSet = [];
     this.closedSet = [];
@@ -167,7 +187,7 @@ class AStar {
       }
 
       neighbor.g = possibleG;
-      neighbor.h = heuristic(neighbor, this.end);
+      neighbor.h = heuristic(neighbor, this.end, this.heuristic);
       neighbor.f = neighbor.g + neighbor.h;
       neighbor.parent = this.current;
       if (
@@ -202,16 +222,46 @@ cellCountSlider.addEventListener("input", (e) => {
   initGrid(cellCount);
 });
 
-const clearButton = document.getElementById("clearGrid");
-clearButton.addEventListener("click", (_) => {
+function resetSearch() {
+  runButton.textContent = "Run";
+  isRunning = false;
+  currentSearch = undefined;
+}
+
+const resetButton = document.getElementById("clearGrid");
+resetButton.addEventListener("click", (_) => {
+  grid.resetSearch();
+  resetSearch();
+});
+const clearWallsButton = document.getElementById("clearWalls");
+clearWallsButton.addEventListener("click", (_) => {
   initGrid(cellCount);
+  resetSearch();
+});
+
+let currentHeuristic = Heuristic.Manhattan;
+const heuristicSelect = document.getElementById("heuristicPicker");
+heuristicSelect.addEventListener("change", (e) => {
+  currentHeuristic = e.target.value;
+  resetSearch();
+  grid.resetSearch();
 });
 
 let currentSearch = undefined;
+let isRunning = false;
 const runButton = document.getElementById("run");
 runButton.addEventListener("click", (_) => {
-  currentSearch = new AStar(grid);
-  runButton.disabled = true;
+  if (isRunning) {
+    runButton.textContent = "Run";
+    isRunning = false;
+  } else {
+    if (currentSearch == undefined) {
+      currentSearch = new AStar(grid, currentHeuristic);
+      grid.resetSearch();
+    }
+    runButton.textContent = "Pause";
+    isRunning = true;
+  }
 });
 
 let stepDelay = 1000;
@@ -243,6 +293,10 @@ function getCellFromPoint(offsetX, offsetY) {
 }
 
 canvas.addEventListener("mousedown", (e) => {
+  if (isRunning) {
+    return;
+  }
+  grid.resetSearch();
   const { offsetX, offsetY } = e;
   const cell = getCellFromPoint(offsetX, offsetY);
   if (cell.state == CellState.Wall || cell.state == CellState.Idle) {
@@ -253,6 +307,9 @@ canvas.addEventListener("mousedown", (e) => {
   }
 });
 canvas.addEventListener("mouseup", (e) => {
+  if (isRunning) {
+    return;
+  }
   if (currentlyDraggedCell) {
     const { x, y, state } = getCellFromPoint(e.offsetX, e.offsetY);
     if (currentlyDraggedCell) {
@@ -360,19 +417,17 @@ function render() {
   renderCells(ctx, grid, cellSize);
   renderGrid(ctx, cellSize * cellCount, cellSize * cellCount, cellSize);
 
-  if (currentSearch) {
+  if (isRunning && currentSearch) {
     const { state, path } = currentSearch.step();
     switch (state) {
       case AStarState.Found:
         console.log("Found path: ", path);
-        currentSearch = undefined;
-        runButton.disabled = false;
+        resetSearch();
         grid.setPath(path);
         break;
       case AStarState.NotFound:
         console.log("Could not find path");
-        currentSearch = undefined;
-        runButton.disabled = false;
+        resetSearch();
         break;
     }
   }
