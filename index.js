@@ -23,6 +23,8 @@ class Cell {
     this.g = 0;
     this.h = 0;
     this.parent = undefined;
+    this.opened = false;
+    this.closed = false;
   }
 }
 
@@ -82,6 +84,18 @@ class Grid {
     if (y < this.size - 1) {
       neighbours.push(this.getCell(x, y + 1));
     }
+    if (x > 0 && y > 0) {
+      neighbours.push(this.getCell(x - 1, y - 1));
+    }
+    if (x < this.size - 1 && y < this.size - 1) {
+      neighbours.push(this.getCell(x + 1, y + 1));
+    }
+    if (x > 0 && y < this.size - 1) {
+      neighbours.push(this.getCell(x - 1, y + 1));
+    }
+    if (x < this.size - 1 && y > 0) {
+      neighbours.push(this.getCell(x + 1, y - 1));
+    }
     return neighbours.filter((cell) => cell.state != CellState.Wall);
   }
 
@@ -120,7 +134,7 @@ function heuristic(from, to, type) {
   return 0;
 }
 
-const AStarState = {
+const SearchState = {
   Searching: 0,
   Found: 1,
   NotFound: 2,
@@ -128,17 +142,15 @@ const AStarState = {
 
 class AStar {
   constructor(grid, heuristicType) {
+    const start = grid.findStart();
     this.grid = grid;
     this.heuristic = heuristicType;
-
-    this.openSet = [];
-    this.closedSet = [];
-    const start = grid.findStart();
-    this.end = grid.findEnd();
-
-    this.openSet.push(start);
-
     this.neighbors = [];
+    this.openSet = [start];
+    this.closedSet = [];
+    this.currentNode = undefined;
+    this.start = start;
+    this.end = grid.findEnd();
   }
 
   step() {
@@ -146,60 +158,69 @@ class AStar {
       return this.stepNeighbors();
     }
     if (this.openSet.length <= 0) {
-      return { state: AStarState.NotFound, path: [] };
+      return { state: SearchState.NotFound, path: [] };
     }
 
-    let lowestIndex = 0;
-    for (let i = 0; i < this.openSet.length; i++) {
-      if (this.openSet[i].f < this.openSet[lowestIndex].f) {
-        lowestIndex = i;
+    this.currentNode = this.openSet[0];
+    for (let i = 1; i < this.openSet.length; i++) {
+      if (this.openSet[i].f <= this.currentNode.f) {
+        if (this.openSet[i].h < this.currentNode.h) {
+          this.currentNode = this.openSet[i];
+        }
       }
     }
-    this.current = this.openSet[lowestIndex];
 
-    if (this.current === this.end) {
-      return { state: AStarState.Found, path: this.retracePath() };
+    this.openSet.splice(this.openSet.indexOf(this.currentNode), 1);
+    if (!this.closedSet.includes(this.currentNode)) {
+      this.closedSet.push(this.currentNode);
     }
 
-    this.openSet.splice(lowestIndex, 1);
-    this.closedSet.push(this.current);
+    if (this.currentNode == this.end) {
+      return {
+        state: SearchState.Found,
+        path: this.retracePath(this.start, this.end),
+      };
+    }
 
-    this.neighbors = this.grid.getNeighbors(this.current.x, this.current.y);
-    return this.stepNeighbors();
+    this.neighbors = this.grid.getNeighbors(
+      this.currentNode.x,
+      this.currentNode.y,
+    );
+    return { state: SearchState.Searching, path: [] };
   }
 
   stepNeighbors() {
-    let neighbor = this.neighbors.shift();
-    if (!this.closedSet.includes(neighbor)) {
-      let possibleG = this.current.g + 1;
+    let neighbor = this.neighbors.pop();
+    if (neighbor.state == CellState.Wall || this.closedSet.includes(neighbor)) {
+      return { state: SearchState.Searching, path: [] };
+    }
+
+    if (neighbor.state != CellState.Start && neighbor.state != CellState.End) {
+      neighbor.state = CellState.Expanded;
+    }
+
+    let newCostToNeighbor =
+      this.currentNode.g +
+      heuristic(this.currentNode, neighbor, this.heuristic);
+    if (newCostToNeighbor < neighbor.g || !this.openSet.includes(neighbor)) {
+      neighbor.g = newCostToNeighbor;
+      neighbor.h = heuristic(neighbor, this.end, this.heuristic);
+      neighbor.f = neighbor.g + neighbor.h;
+      neighbor.parent = this.currentNode;
 
       if (!this.openSet.includes(neighbor)) {
         this.openSet.push(neighbor);
-      } else if (possibleG >= neighbor.g) {
-        return { state: AStarState.Searching, path: [] };
-      }
-
-      neighbor.g = possibleG;
-      neighbor.h = heuristic(neighbor, this.end, this.heuristic);
-      neighbor.f = neighbor.g + neighbor.h;
-      neighbor.parent = this.current;
-      if (
-        neighbor.state != CellState.Start &&
-        neighbor.state != CellState.End
-      ) {
-        neighbor.state = CellState.Expanded;
       }
     }
-    return { state: AStarState.Searching, path: [] };
+    return { state: SearchState.Searching, path: [] };
   }
 
-  retracePath() {
+  retracePath(start, end) {
     let path = [];
-    let temp = this.current;
-    path.push(temp);
-    while (temp.parent) {
-      path.push(temp.parent);
-      temp = temp.parent;
+    let current = end;
+    while (current != start) {
+      path.push(current);
+      current = current.parent;
     }
     return path.reverse();
   }
@@ -424,12 +445,12 @@ function render() {
   if (isRunning && currentSearch) {
     const { state, path } = currentSearch.step();
     switch (state) {
-      case AStarState.Found:
+      case SearchState.Found:
         console.log("Found path: ", path);
         resetSearch();
         grid.setPath(path);
         break;
-      case AStarState.NotFound:
+      case SearchState.NotFound:
         console.log("Could not find path");
         resetSearch();
         break;
