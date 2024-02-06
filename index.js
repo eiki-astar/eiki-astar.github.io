@@ -10,11 +10,6 @@ const CellState = {
   Path: 6,
 };
 
-const Heuristic = {
-  Manhattan: "Manhattan",
-  Euclidean: "Euclidean",
-};
-
 class Cell {
   constructor(x, y, state) {
     this.x = x;
@@ -125,16 +120,11 @@ class Grid {
 }
 
 // Manhattan distance from now
-function heuristic(from, to, type) {
+function heuristic(from, to) {
   let x = Math.abs(from.x - to.x);
   let y = Math.abs(from.y - to.y);
-  switch (type) {
-    case Heuristic.Manhattan:
-      return x + y;
-    case Heuristic.Euclidean:
-      return Math.sqrt(x * x + y * y);
-  }
-  return 0;
+  if (x > y) return 14 * y + 10 * (x - y);
+  return 14 * x + 10 * (y - x);
 }
 
 const SearchState = {
@@ -145,10 +135,9 @@ const SearchState = {
 };
 
 class AStar {
-  constructor(grid, heuristicType) {
+  constructor(grid) {
     const start = grid.findStart();
     this.grid = grid;
-    this.heuristic = heuristicType;
     this.neighbors = [];
     this.openSet = [start];
     this.closedSet = [];
@@ -213,11 +202,10 @@ class AStar {
     }
 
     let newCostToNeighbor =
-      this.currentNode.g +
-      heuristic(this.currentNode, neighbor, this.heuristic);
+      this.currentNode.g + heuristic(this.currentNode, neighbor);
     if (newCostToNeighbor < neighbor.g || !this.openSet.includes(neighbor)) {
       neighbor.g = newCostToNeighbor;
-      neighbor.h = heuristic(neighbor, this.end, this.heuristic);
+      neighbor.h = heuristic(neighbor, this.end);
       neighbor.f = neighbor.g + neighbor.h;
       neighbor.parent = this.currentNode;
 
@@ -283,14 +271,6 @@ clearWallsButton.addEventListener("click", (_) => {
   resetSearch();
 });
 
-let currentHeuristic = Heuristic.Manhattan;
-const heuristicSelect = document.getElementById("heuristicPicker");
-heuristicSelect.addEventListener("change", (e) => {
-  currentHeuristic = e.target.value;
-  resetSearch();
-  grid.resetSearch();
-});
-
 let currentSearch = undefined;
 let isRunning = false;
 const runButton = document.getElementById("run");
@@ -300,7 +280,7 @@ runButton.addEventListener("click", (_) => {
     isRunning = false;
   } else {
     if (currentSearch == undefined) {
-      currentSearch = new AStar(grid, currentHeuristic);
+      currentSearch = new AStar(grid);
       grid.resetSearch();
     }
     runButton.textContent = "Pause";
@@ -311,7 +291,7 @@ const stepForward = document.getElementById("stepForward");
 stepForward.addEventListener("click", (_) => {
   if (!isRunning) {
     if (currentSearch == undefined) {
-      currentSearch = new AStar(grid, currentHeuristic);
+      currentSearch = new AStar(grid);
       grid.resetSearch();
     }
     performStep();
