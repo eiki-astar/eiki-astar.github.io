@@ -64,7 +64,7 @@ class Grid {
     this.cells[y * this.size + x].state = state;
   }
 
-  getNeighbors(x, y) {
+  getNeighbors(x, y, allowDiagonal) {
     let neighbours = [];
     if (x > 0) {
       neighbours.push(this.getCell(x - 1, y));
@@ -78,17 +78,19 @@ class Grid {
     if (y < this.size - 1) {
       neighbours.push(this.getCell(x, y + 1));
     }
-    if (x > 0 && y > 0) {
-      neighbours.push(this.getCell(x - 1, y - 1));
-    }
-    if (x < this.size - 1 && y < this.size - 1) {
-      neighbours.push(this.getCell(x + 1, y + 1));
-    }
-    if (x > 0 && y < this.size - 1) {
-      neighbours.push(this.getCell(x - 1, y + 1));
-    }
-    if (x < this.size - 1 && y > 0) {
-      neighbours.push(this.getCell(x + 1, y - 1));
+    if (allowDiagonal) {
+      if (x > 0 && y > 0) {
+        neighbours.push(this.getCell(x - 1, y - 1));
+      }
+      if (x < this.size - 1 && y < this.size - 1) {
+        neighbours.push(this.getCell(x + 1, y + 1));
+      }
+      if (x > 0 && y < this.size - 1) {
+        neighbours.push(this.getCell(x - 1, y + 1));
+      }
+      if (x < this.size - 1 && y > 0) {
+        neighbours.push(this.getCell(x + 1, y - 1));
+      }
     }
     return neighbours.filter((cell) => cell.state != CellState.Wall);
   }
@@ -135,7 +137,7 @@ const SearchState = {
 };
 
 class AStar {
-  constructor(grid) {
+  constructor(grid, allowDiagonal) {
     const start = grid.findStart();
     this.grid = grid;
     this.neighbors = [];
@@ -144,6 +146,7 @@ class AStar {
     this.currentNode = undefined;
     this.start = start;
     this.end = grid.findEnd();
+    this.allowDiagonal = allowDiagonal;
   }
 
   step() {
@@ -190,6 +193,7 @@ class AStar {
     this.neighbors = this.grid.getNeighbors(
       this.currentNode.x,
       this.currentNode.y,
+      this.allowDiagonal,
     );
     let state = changed ? SearchState.StateChanged : SearchState.Searching;
     return { state: state, path: [] };
@@ -307,6 +311,15 @@ stepDelayValue.textContent = stepDelay;
 stepDelaySlider.addEventListener("input", (e) => {
   stepDelayValue.textContent = e.target.value;
   stepDelay = e.target.value;
+});
+
+let allowDiagonal = false;
+const allowDiagonalCheckbox = document.getElementById("allowDiagonal");
+allowDiagonalCheckbox.addEventListener("change", (e) => {
+  allowDiagonal = e.target.checked;
+  resetSearch();
+  currentSearch = new AStar(grid, allowDiagonal);
+  grid.resetSearch();
 });
 
 const canvas = document.getElementById("canvas");
@@ -464,6 +477,11 @@ function renderCells(ctx, grid, step) {
         case CellState.Path:
           ctx.fillStyle = "rgb(0,0,120)";
           ctx.fillRect(x * step, y * step, step, step);
+
+          ctx.fillStyle = "rgb(255,255,255)";
+          ctx.fillText("G: " + cell.g, x * step + 5, y * step + 15);
+          ctx.fillText("H: " + cell.h, x * step + 5, y * step + 25);
+          ctx.fillText("F: " + cell.f, x * step + 5, y * step + 35);
           break;
       }
     }
