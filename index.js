@@ -24,8 +24,6 @@ class Cell {
     this.g = 0;
     this.h = 0;
     this.parent = undefined;
-    this.opened = false;
-    this.closed = false;
   }
 }
 
@@ -115,7 +113,11 @@ class Grid {
 
   resetSearch() {
     for (let cell of this.cells) {
-      if (cell.state == CellState.Expanded || cell.state == CellState.Path) {
+      if (
+        cell.state == CellState.Opened ||
+        cell.state == CellState.Closed ||
+        cell.state == CellState.Path
+      ) {
         cell.state = CellState.Idle;
       }
     }
@@ -137,8 +139,9 @@ function heuristic(from, to, type) {
 
 const SearchState = {
   Searching: 0,
-  Found: 1,
-  NotFound: 2,
+  StateChanged: 1,
+  Found: 2,
+  NotFound: 3,
 };
 
 class AStar {
@@ -156,6 +159,10 @@ class AStar {
 
   step() {
     if (this.neighbors.length > 0) {
+      if (this.neighbors.length == 1) {
+        this.stepNeighbors();
+        return { state: SearchState.StateChanged, path: [] };
+      }
       return this.stepNeighbors();
     }
     if (this.openSet.length <= 0) {
@@ -171,6 +178,7 @@ class AStar {
       }
     }
 
+    let changed = false;
     this.openSet.splice(this.openSet.indexOf(this.currentNode), 1);
     if (!this.closedSet.includes(this.currentNode)) {
       this.closedSet.push(this.currentNode);
@@ -178,7 +186,9 @@ class AStar {
         this.currentNode.state != CellState.Start &&
         this.currentNode.state != CellState.End
       ) {
+        changed = true;
         this.currentNode.state = CellState.Closed;
+        console.log(this.currentNode);
       }
     }
 
@@ -193,7 +203,8 @@ class AStar {
       this.currentNode.x,
       this.currentNode.y,
     );
-    return { state: SearchState.Searching, path: [] };
+    let state = changed ? SearchState.StateChanged : SearchState.Searching;
+    return { state: state, path: [] };
   }
 
   stepNeighbors() {
@@ -377,9 +388,11 @@ canvas.addEventListener("mouseup", (e) => {
 });
 
 function performStep() {
-  if (currentSearch) {
+  while (currentSearch) {
     const { state, path } = currentSearch.step();
     switch (state) {
+      case SearchState.StateChanged:
+        return;
       case SearchState.Found:
         console.log("Found path: ", path);
         resetSearch();
@@ -458,6 +471,7 @@ function renderCells(ctx, grid, step) {
           ctx.fillText("G: " + cell.g, x * step + 5, y * step + 15);
           ctx.fillText("H: " + cell.h, x * step + 5, y * step + 25);
           ctx.fillText("F: " + cell.f, x * step + 5, y * step + 35);
+          break;
         case CellState.Closed:
           ctx.fillStyle = "rgb(120,0,0)";
           ctx.fillRect(x * step, y * step, step, step);
@@ -466,7 +480,6 @@ function renderCells(ctx, grid, step) {
           ctx.fillText("G: " + cell.g, x * step + 5, y * step + 15);
           ctx.fillText("H: " + cell.h, x * step + 5, y * step + 25);
           ctx.fillText("F: " + cell.f, x * step + 5, y * step + 35);
-
           break;
         case CellState.Path:
           ctx.fillStyle = "rgb(0,0,120)";
