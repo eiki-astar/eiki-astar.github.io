@@ -237,7 +237,7 @@ class AStar {
   }
 }
 
-let cellCount = 5;
+let cellCount = 20;
 let grid = new Grid(cellCount);
 
 function initGrid(count) {
@@ -284,7 +284,7 @@ runButton.addEventListener("click", (_) => {
     isRunning = false;
   } else {
     if (currentSearch == undefined) {
-      currentSearch = new AStar(grid);
+      currentSearch = new AStar(grid, allowDiagonal);
       grid.resetSearch();
     }
     runButton.textContent = "Pause";
@@ -295,7 +295,7 @@ const stepForward = document.getElementById("stepForward");
 stepForward.addEventListener("click", (_) => {
   if (!isRunning) {
     if (currentSearch == undefined) {
-      currentSearch = new AStar(grid);
+      currentSearch = new AStar(grid, allowDiagonal);
       grid.resetSearch();
     }
     performStep();
@@ -438,6 +438,11 @@ function renderGrid(ctx, w, h, step) {
   ctx.stroke();
 }
 
+const PATH_COLOR = "#2347BD";
+const OPENED_COLOR = "#00C914";
+const CLOSED_COLOR = "#B30600";
+const WALL_COLOR = "#505050";
+
 function renderCells(ctx, grid, step) {
   for (let y = 0; y < grid.size; y++) {
     for (let x = 0; x < grid.size; x++) {
@@ -445,47 +450,89 @@ function renderCells(ctx, grid, step) {
 
       switch (grid.getCellState(x, y)) {
         case CellState.Wall:
-          ctx.fillStyle = "rgb(80,80,80)";
-          ctx.fillRect(x * step, y * step, step, step);
+          fillCell(ctx, x, y, step, WALL_COLOR);
           break;
         case CellState.Start:
-          ctx.fillStyle = "rgb(0,255,0)";
-          ctx.fillRect(x * step, y * step, step, step);
+          fillCell(ctx, x, y, step, PATH_COLOR);
+          renderCenteredTextAt(ctx, "A", x * step, y * step, step, step, 2);
           break;
         case CellState.End:
-          ctx.fillStyle = "rgb(255,0,0)";
+          fillCell(ctx, x, y, step, PATH_COLOR);
           ctx.fillRect(x * step, y * step, step, step);
+          renderCenteredTextAt(ctx, "B", x * step, y * step, step, step, 2);
           break;
         case CellState.Opened:
-          ctx.fillStyle = "rgb(0,120,0)";
-          ctx.fillRect(x * step, y * step, step, step);
-
-          ctx.fillStyle = "rgb(255,255,255)";
-          ctx.fillText("G: " + cell.g, x * step + 5, y * step + 15);
-          ctx.fillText("H: " + cell.h, x * step + 5, y * step + 25);
-          ctx.fillText("F: " + cell.f, x * step + 5, y * step + 35);
+          fillCell(ctx, x, y, step, OPENED_COLOR);
+          renderNodeCost(ctx, cell, x * step, y * step, step);
           break;
         case CellState.Closed:
-          ctx.fillStyle = "rgb(120,0,0)";
-          ctx.fillRect(x * step, y * step, step, step);
-
-          ctx.fillStyle = "rgb(255,255,255)";
-          ctx.fillText("G: " + cell.g, x * step + 5, y * step + 15);
-          ctx.fillText("H: " + cell.h, x * step + 5, y * step + 25);
-          ctx.fillText("F: " + cell.f, x * step + 5, y * step + 35);
+          fillCell(ctx, x, y, step, CLOSED_COLOR);
+          renderNodeCost(ctx, cell, x * step, y * step, step);
           break;
         case CellState.Path:
-          ctx.fillStyle = "rgb(0,0,120)";
-          ctx.fillRect(x * step, y * step, step, step);
-
-          ctx.fillStyle = "rgb(255,255,255)";
-          ctx.fillText("G: " + cell.g, x * step + 5, y * step + 15);
-          ctx.fillText("H: " + cell.h, x * step + 5, y * step + 25);
-          ctx.fillText("F: " + cell.f, x * step + 5, y * step + 35);
+          fillCell(ctx, x, y, step, PATH_COLOR);
+          renderNodeCost(ctx, cell, x * step, y * step, step);
           break;
       }
     }
   }
+}
+
+function fillCell(ctx, x, y, cellSize, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+}
+
+function renderNodeCost(ctx, cell, x, y, cellSize) {
+  ctx.fillStyle = "rgb(255,255,255)";
+  renderCenteredTextAt(ctx, cell.f, x, y - cellSize / 6, cellSize, cellSize, 4);
+  renderCenteredTextAt(
+    ctx,
+    cell.g,
+    x + cellSize / 10,
+    y + cellSize / 1.8,
+    cellSize / 4,
+    cellSize / 2,
+    1.5,
+  );
+  renderCenteredTextAt(
+    ctx,
+    cell.h,
+    x + cellSize - cellSize / 2.75,
+    y + cellSize / 1.8,
+    cellSize / 4,
+    cellSize / 2,
+    1.5,
+  );
+}
+
+function renderCenteredTextAt(
+  ctx,
+  text,
+  x,
+  y,
+  width,
+  height,
+  fontScalingFactor,
+) {
+  ctx.translate(x, y);
+  renderCenteredText(ctx, text, width, height, fontScalingFactor);
+  ctx.translate(-x, -y);
+}
+
+function renderCenteredText(ctx, text, width, height, fontScalingFactor) {
+  const fontSize = Math.floor(width / fontScalingFactor);
+  ctx.fillStyle = "white";
+  ctx.font = `${fontSize}px sans-serif`;
+  ctx.textBaseline = "middle";
+  ctx.textAlign = "center";
+  let { actualBoundingBoxAscent, actualBoundingBoxDescent } =
+    ctx.measureText(text);
+  ctx.fillText(
+    text,
+    width / 2,
+    height / 2 + (actualBoundingBoxAscent - actualBoundingBoxDescent) / 2,
+  );
 }
 
 function render() {
