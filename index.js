@@ -188,7 +188,6 @@ class AStar {
       ) {
         changed = true;
         this.currentNode.state = CellState.Closed;
-        console.log(this.currentNode);
       }
     }
 
@@ -316,6 +315,7 @@ stepForward.addEventListener("click", (_) => {
       grid.resetSearch();
     }
     performStep();
+    requestAnimationFrame(render);
   }
 });
 
