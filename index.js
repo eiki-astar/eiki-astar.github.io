@@ -5,8 +5,9 @@ const CellState = {
   Wall: 1,
   Start: 2,
   End: 3,
-  Expanded: 4,
-  Path: 5,
+  Opened: 4,
+  Closed: 5,
+  Path: 6,
 };
 
 const Heuristic = {
@@ -173,6 +174,12 @@ class AStar {
     this.openSet.splice(this.openSet.indexOf(this.currentNode), 1);
     if (!this.closedSet.includes(this.currentNode)) {
       this.closedSet.push(this.currentNode);
+      if (
+        this.currentNode.state != CellState.Start &&
+        this.currentNode.state != CellState.End
+      ) {
+        this.currentNode.state = CellState.Closed;
+      }
     }
 
     if (this.currentNode == this.end) {
@@ -195,10 +202,6 @@ class AStar {
       return { state: SearchState.Searching, path: [] };
     }
 
-    if (neighbor.state != CellState.Start && neighbor.state != CellState.End) {
-      neighbor.state = CellState.Expanded;
-    }
-
     let newCostToNeighbor =
       this.currentNode.g +
       heuristic(this.currentNode, neighbor, this.heuristic);
@@ -209,6 +212,12 @@ class AStar {
       neighbor.parent = this.currentNode;
 
       if (!this.openSet.includes(neighbor)) {
+        if (
+          neighbor.state != CellState.Start &&
+          neighbor.state != CellState.End
+        ) {
+          neighbor.state = CellState.Opened;
+        }
         this.openSet.push(neighbor);
       }
     }
@@ -288,6 +297,16 @@ runButton.addEventListener("click", (_) => {
     isRunning = true;
   }
 });
+const stepForward = document.getElementById("stepForward");
+stepForward.addEventListener("click", (_) => {
+  if (!isRunning) {
+    if (currentSearch == undefined) {
+      currentSearch = new AStar(grid, currentHeuristic);
+      grid.resetSearch();
+    }
+    performStep();
+  }
+});
 
 let stepDelay = 1000;
 const stepDelaySlider = document.getElementById("stepDelaySlider");
@@ -357,6 +376,23 @@ canvas.addEventListener("mouseup", (e) => {
   }
 });
 
+function performStep() {
+  if (currentSearch) {
+    const { state, path } = currentSearch.step();
+    switch (state) {
+      case SearchState.Found:
+        console.log("Found path: ", path);
+        resetSearch();
+        grid.setPath(path);
+        break;
+      case SearchState.NotFound:
+        console.log("Could not find path");
+        resetSearch();
+        break;
+    }
+  }
+}
+
 const observer = new ResizeObserver((_) => {
   canvas.width = canvas.clientWidth;
   canvas.height = canvas.clientHeight;
@@ -399,6 +435,8 @@ function renderGrid(ctx, w, h, step) {
 function renderCells(ctx, grid, step) {
   for (let y = 0; y < grid.size; y++) {
     for (let x = 0; x < grid.size; x++) {
+      const cell = grid.getCell(x, y);
+
       switch (grid.getCellState(x, y)) {
         case CellState.Wall:
           ctx.fillStyle = "rgb(80,80,80)";
@@ -412,11 +450,18 @@ function renderCells(ctx, grid, step) {
           ctx.fillStyle = "rgb(255,0,0)";
           ctx.fillRect(x * step, y * step, step, step);
           break;
-        case CellState.Expanded:
+        case CellState.Opened:
           ctx.fillStyle = "rgb(0,120,0)";
           ctx.fillRect(x * step, y * step, step, step);
 
-          const cell = grid.getCell(x, y);
+          ctx.fillStyle = "rgb(255,255,255)";
+          ctx.fillText("G: " + cell.g, x * step + 5, y * step + 15);
+          ctx.fillText("H: " + cell.h, x * step + 5, y * step + 25);
+          ctx.fillText("F: " + cell.f, x * step + 5, y * step + 35);
+        case CellState.Closed:
+          ctx.fillStyle = "rgb(120,0,0)";
+          ctx.fillRect(x * step, y * step, step, step);
+
           ctx.fillStyle = "rgb(255,255,255)";
           ctx.fillText("G: " + cell.g, x * step + 5, y * step + 15);
           ctx.fillText("H: " + cell.h, x * step + 5, y * step + 25);
@@ -442,19 +487,8 @@ function render() {
   renderCells(ctx, grid, cellSize);
   renderGrid(ctx, cellSize * cellCount, cellSize * cellCount, cellSize);
 
-  if (isRunning && currentSearch) {
-    const { state, path } = currentSearch.step();
-    switch (state) {
-      case SearchState.Found:
-        console.log("Found path: ", path);
-        resetSearch();
-        grid.setPath(path);
-        break;
-      case SearchState.NotFound:
-        console.log("Could not find path");
-        resetSearch();
-        break;
-    }
+  if (isRunning) {
+    performStep();
   }
 
   setTimeout(function () {
